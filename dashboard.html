@@ -6,28 +6,47 @@
 
   <style>
     #map { height: 100vh; width: 100%; }
+
+    .panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      z-index: 1000;
+    }
+
+    input {
+      width: 150px;
+      margin-bottom: 5px;
+    }
   </style>
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
+
+<div class="panel">
+  <b>Admin Manual Entry</b><br><br>
+
+  <input id="reqIdInput" placeholder="Req ID"><br>
+  <input id="latInput" placeholder="Latitude"><br>
+  <input id="lonInput" placeholder="Longitude"><br>
+
+  <button onclick="addManualLocation()">Add Location</button>
+</div>
+
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-
-const BASE_URL = "https://emergency-location.onrender.com";
-
 const map = L.map('map').setView([28.6139, 77.2090], 12);
 
-// OpenStreetMap tiles
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19,
-  attribution: '&copy; OpenStreetMap'
+  maxZoom: 19
 }).addTo(map);
 
 const markers = {};
@@ -42,7 +61,6 @@ function getColor(id){
   return reqColorMap[id];
 }
 
-// Marker icon
 function createIcon(color){
   return L.icon({
     iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
@@ -52,34 +70,60 @@ function createIcon(color){
   });
 }
 
-// Load live locations
-async function loadLocations(){
-  try {
-    const res = await fetch(`${BASE_URL}/locations`);
-    const data = await res.json();
+// 🔥 ADMIN MANUAL ENTRY
+async function addManualLocation() {
+  const reqId = document.getElementById("reqIdInput").value;
+  const lat = parseFloat(document.getElementById("latInput").value);
+  const lon = parseFloat(document.getElementById("lonInput").value);
 
-    data.forEach(loc => {
-      const id = loc.reqId || "unknown";
-      const latlng = [loc.lat, loc.lon];
-      const color = getColor(id);
-
-      if(markers[id]){
-        markers[id].setLatLng(latlng);
-      } else {
-        const marker = L.marker(latlng, {
-          icon: createIcon(color)
-        }).addTo(map);
-
-        marker.bindPopup(`Req: ${id}`);
-        markers[id] = marker;
-
-        map.setView(latlng, 15);
-      }
-    });
-
-  } catch (err) {
-    console.error("Error loading locations:", err);
+  if (!reqId || isNaN(lat) || isNaN(lon)) {
+    alert("Enter valid values");
+    return;
   }
+
+  await fetch('/location', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      lat,
+      lon,
+      reqId,
+      manual: true,
+      source: "ADMIN"
+    })
+  });
+
+  alert("Manual location added");
+}
+
+
+// 📍 LOAD LOCATIONS
+async function loadLocations(){
+  const res = await fetch('/locations');
+  const data = await res.json();
+
+  data.forEach(loc => {
+    if(loc.event === "DISCONNECTED") return;
+
+    const id = loc.reqId || "unknown";
+    const latlng = [loc.lat, loc.lon];
+    const color = getColor(id);
+
+    if(markers[id]){
+      markers[id].setLatLng(latlng);
+    } else {
+      const marker = L.marker(latlng, {
+        icon: createIcon(color)
+      }).addTo(map);
+
+      marker.bindPopup(
+        `Req: ${id}<br>Type: ${loc.type || "GPS"}<br>Source: ${loc.source || "USER"}`
+      );
+
+      markers[id] = marker;
+      map.setView(latlng, 15);
+    }
+  });
 }
 
 setInterval(loadLocations, 3000);
