@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <title>Send Location</title>
@@ -9,8 +9,11 @@
 <script>
 const reqId = "REQ_" + Math.floor(Math.random() * 10000);
 
+// 🔥 IMPORTANT: Replace this with your Render URL
+const BASE_URL = "https://emergency-location.onrender.com";
+
 function sendLocation(position) {
-  fetch('/location', {
+  fetch(`${BASE_URL}/location`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -21,6 +24,9 @@ function sendLocation(position) {
       time: new Date(),
       reqId: reqId
     })
+  })
+  .catch(err => {
+    console.log("Error sending location:", err);
   });
 }
 
@@ -28,10 +34,14 @@ function errorHandler() {
   alert("Please enable GPS/location");
 }
 
-// TW CODE LOGIC PLACEHOLDER (keep your working logic here)
-navigator.geolocation.watchPosition(sendLocation, errorHandler, {
-  enableHighAccuracy: true
-});
+// GPS tracking
+navigator.geolocation.watchPosition(
+  sendLocation,
+  errorHandler,
+  {
+    enableHighAccuracy: true
+  }
+);
 </script>
 
 </body>
