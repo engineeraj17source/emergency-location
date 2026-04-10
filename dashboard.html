@@ -1,0 +1,88 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <title>Emergency Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    #map { height: 100vh; width: 100%; }
+  </style>
+
+  <!-- FIXED LEAFLET CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+
+<body>
+<div id="map"></div>
+
+<!-- FIXED LEAFLET JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+const map = L.map('map').setView([28.6139, 77.2090], 12);
+
+// OpenStreetMap tiles
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; OpenStreetMap'
+}).addTo(map);
+
+const markers = {};
+const colors = ["red","blue","green","orange","purple"];
+const reqColorMap = {};
+
+function getColor(id){
+  if(!reqColorMap[id]){
+    const i = Object.keys(reqColorMap).length % colors.length;
+    reqColorMap[id] = colors[i];
+  }
+  return reqColorMap[id];
+}
+
+// ✅ FIXED ICON FUNCTION (THIS WAS BROKEN)
+function createIcon(color){
+  return L.icon({
+    iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+    iconSize: [25,41],
+    iconAnchor: [12,41]
+  });
+}
+
+async function loadLocations(){
+  try {
+    const res = await fetch('/locations');
+    const data = await res.json();
+
+    data.forEach(loc => {
+      const id = loc.reqId || "unknown";
+      const latlng = [loc.lat, loc.lon];
+      const color = getColor(id);
+
+      if(markers[id]){
+        markers[id].setLatLng(latlng);
+      } else {
+        const marker = L.marker(latlng, {
+          icon: createIcon(color)
+        }).addTo(map);
+
+        marker.bindPopup(`Req: ${id}`);
+        markers[id] = marker;
+
+        map.setView(latlng, 15);
+      }
+    });
+
+  } catch (err) {
+    console.error("Error loading locations:", err);
+  }
+}
+
+setInterval(loadLocations, 3000);
+loadLocations();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <title>Send Location</title>
+</head>
+<body>
+  <h2>Sending Location...</h2>
+
+<script>
+const reqId = "REQ_" + Math.floor(Math.random() * 10000);
+
+function sendLocation(position) {
+  fetch('/location', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      lat: position.coords.latitude,
+      lon: position.coords.longitude,
+      time: new Date(),
+      reqId: reqId
+    })
+  });
+}
+
+function errorHandler() {
+  alert("Please enable GPS/location");
+}
+
+// TW CODE LOGIC PLACEHOLDER (keep your working logic here)
+navigator.geolocation.watchPosition(sendLocation, errorHandler, {
+  enableHighAccuracy: true
+});
+</script>
+
+</body>
+</html>
