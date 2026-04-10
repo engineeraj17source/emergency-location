@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <title>Emergency Dashboard</title>
@@ -8,17 +8,19 @@
     #map { height: 100vh; width: 100%; }
   </style>
 
-  <!-- FIXED LEAFLET CDN -->
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
 <div id="map"></div>
 
-<!-- FIXED LEAFLET JS -->
+<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+
+const BASE_URL = "https://emergency-location.onrender.com";
 
 const map = L.map('map').setView([28.6139, 77.2090], 12);
 
@@ -40,7 +42,7 @@ function getColor(id){
   return reqColorMap[id];
 }
 
-// ✅ FIXED ICON FUNCTION (THIS WAS BROKEN)
+// Marker icon
 function createIcon(color){
   return L.icon({
     iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
@@ -50,9 +52,10 @@ function createIcon(color){
   });
 }
 
+// Load live locations
 async function loadLocations(){
   try {
-    const res = await fetch('/locations');
+    const res = await fetch(`${BASE_URL}/locations`);
     const data = await res.json();
 
     data.forEach(loc => {
