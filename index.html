@@ -1,47 +1,145 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Send Location</title>
+  <title>Emergency Location Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+      padding: 40px;
+      background: #f8f8f8;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+    }
+
+    button {
+      background: red;
+      color: white;
+      font-size: 20px;
+      padding: 15px 25px;
+      border: none;
+      border-radius: 8px;
+      margin: 10px;
+      cursor: pointer;
+    }
+
+    #smsBtn {
+      background: #2563eb;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #333;
+      white-space: pre-line;
+      text-align: left;
+      display: inline-block;
+      max-width: 90%;
+    }
+  </style>
 </head>
+
 <body>
-  <h2>Sending Location...</h2>
+
+<h2>📍 Emergency Location Tracker</h2>
+<p>Track live location or send emergency SMS.</p>
+
+<button onclick="startTracking()">START SHARING</button>
+<button onclick="stopTracking()">STOP SHARING</button>
+<button id="smsBtn" onclick="sendSMS()">SEND SMS</button>
+
+<p id="status"></p>
 
 <script>
+const BASE_URL = "https://emergency-location.onrender.com";
 const reqId = "REQ_" + Math.floor(Math.random() * 10000);
 
-// 🔥 IMPORTANT: Replace this with your Render URL
-const BASE_URL = "https://emergency-location.onrender.com";
+let watchId = null;
+let lastLat = null;
+let lastLon = null;
+let tracking = false;
 
-function sendLocation(position) {
-  fetch(`${BASE_URL}/location`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
+function setStatus(msg) {
+  document.getElementById("status").innerText = msg;
+}
+
+function startTracking() {
+  if (tracking) return;
+
+  tracking = true;
+  setStatus("Starting tracking...\nPlease allow GPS permission.");
+
+  watchId = navigator.geolocation.watchPosition(
+    function(position) {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      const acc = position.coords.accuracy;
+
+      lastLat = lat;
+      lastLon = lon;
+
+      setStatus(
+`TRACKING ACTIVE
+
+Lat: ${lat}
+Lon: ${lon}
+Accuracy: ±${acc}m`
+      );
+
+      fetch(`${BASE_URL}/location`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat, lon, reqId })
+      });
     },
-    body: JSON.stringify({
-      lat: position.coords.latitude,
-      lon: position.coords.longitude,
-      time: new Date(),
-      reqId: reqId
-    })
-  })
-  .catch(err => {
-    console.log("Error sending location:", err);
+
+    function() {
+      setStatus("⚠️ GPS error. Enable location and retry.");
+    },
+
+    { enableHighAccuracy: true }
+  );
+
+  fetch(`${BASE_URL}/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reqId })
   });
 }
 
-function errorHandler() {
-  alert("Please enable GPS/location");
+function stopTracking() {
+  tracking = false;
+
+  navigator.geolocation.clearWatch(watchId);
+
+  setStatus("🛑 Tracking stopped.");
+
+  fetch(`${BASE_URL}/stop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reqId })
+  });
 }
 
-// GPS tracking
-navigator.geolocation.watchPosition(
-  sendLocation,
-  errorHandler,
-  {
-    enableHighAccuracy: true
-  }
-);
+function sendSMS() {
+  let lat = lastLat || "Not available";
+  let lon = lastLon || "Not available";
+  let time = new Date().toLocaleString();
+
+  const message =
+`EMERGENCY ALERT
+REQID: ${reqId}
+Lat: ${lat}
+Lon: ${lon}
+Time: ${time}`;
+
+  window.location.href =
+    `sms:+918076529930?body=${encodeURIComponent(message)}`;
+}
 </script>
 
 </body>
