@@ -14,31 +14,32 @@ let activeUsers = new Set();
 let stoppedUsers = new Set();
 
 
-// 📍 LOCATION API (supports GPS + ADMIN manual)
+// 📍 LOCATION API (FINAL FIXED VERSION)
 app.post('/location', (req, res) => {
   const loc = req.body;
   const reqId = loc.reqId || "unknown";
 
-  // ❌ block stopped users
-  if (stoppedUsers.has(reqId)) {
+  const isManual = loc.manual === true;
+  const source = loc.source || "USER";
+
+  // ❌ block stopped users (ONLY for GPS)
+  if (!isManual && stoppedUsers.has(reqId)) {
     console.log("⛔ Ignored (STOPPED):", reqId);
     return res.status(403).json({ error: "Tracking stopped" });
   }
 
-  // ❌ block non-active users
-  if (!activeUsers.has(reqId)) {
+  // ❌ block non-active users (ONLY for GPS)
+  if (!isManual && !activeUsers.has(reqId)) {
     console.log("⛔ Ignored (NOT ACTIVE):", reqId);
     return res.status(403).json({ error: "Tracking not active" });
   }
 
-  // validate
+  // ✅ validate
   if (typeof loc?.lat !== 'number' || typeof loc?.lon !== 'number') {
     return res.status(400).json({ error: "Invalid location data" });
   }
 
-  const isManual = loc.manual === true;
-  const source = loc.source || "USER";
-
+  // ✅ ACCEPT (GPS + ADMIN MANUAL)
   locations.push({
     lat: loc.lat,
     lon: loc.lon,
@@ -49,15 +50,18 @@ app.post('/location', (req, res) => {
   });
 
   console.log(
-    isManual ? "✍️ Manual:" : "📍 GPS:",
-    reqId
+    isManual
+      ? "✍️ MANUAL/ADMIN:",
+      reqId
+      : "📍 GPS:",
+      reqId
   );
 
   res.sendStatus(200);
 });
 
 
-// 🟢 START
+// 🟢 START TRACKING
 app.post('/start', (req, res) => {
   const { reqId } = req.body;
 
@@ -70,7 +74,7 @@ app.post('/start', (req, res) => {
 });
 
 
-// 🔴 STOP
+// 🔴 STOP TRACKING
 app.post('/stop', (req, res) => {
   const { reqId } = req.body;
 
@@ -89,12 +93,13 @@ app.post('/stop', (req, res) => {
 });
 
 
-// 📊 FETCH
+// 📊 FETCH LOCATIONS
 app.get('/locations', (req, res) => {
   res.json(locations);
 });
 
 
+// ❤️ HEALTH CHECK
 app.get('/', (req, res) => {
   res.send("Server is running");
 });
