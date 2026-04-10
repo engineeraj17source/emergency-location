@@ -14,7 +14,7 @@ let activeUsers = new Set();
 let stoppedUsers = new Set();
 
 
-// 📍 LOCATION API (FINAL FIXED VERSION)
+// 📍 LOCATION API (GPS + ADMIN MANUAL SUPPORT)
 app.post('/location', (req, res) => {
   const loc = req.body;
   const reqId = loc.reqId || "unknown";
@@ -22,24 +22,24 @@ app.post('/location', (req, res) => {
   const isManual = loc.manual === true;
   const source = loc.source || "USER";
 
-  // ❌ block stopped users (ONLY for GPS)
+  // ❌ block stopped users (only for GPS)
   if (!isManual && stoppedUsers.has(reqId)) {
     console.log("⛔ Ignored (STOPPED):", reqId);
     return res.status(403).json({ error: "Tracking stopped" });
   }
 
-  // ❌ block non-active users (ONLY for GPS)
+  // ❌ block non-active users (only for GPS)
   if (!isManual && !activeUsers.has(reqId)) {
     console.log("⛔ Ignored (NOT ACTIVE):", reqId);
     return res.status(403).json({ error: "Tracking not active" });
   }
 
-  // ✅ validate
+  // ✅ validate lat/lon
   if (typeof loc?.lat !== 'number' || typeof loc?.lon !== 'number') {
     return res.status(400).json({ error: "Invalid location data" });
   }
 
-  // ✅ ACCEPT (GPS + ADMIN MANUAL)
+  // ✅ store location
   locations.push({
     lat: loc.lat,
     lon: loc.lon,
@@ -49,13 +49,12 @@ app.post('/location', (req, res) => {
     time: new Date().toISOString()
   });
 
-  console.log(
-    isManual
-      ? "✍️ MANUAL/ADMIN:",
-      reqId
-      : "📍 GPS:",
-      reqId
-  );
+  // ✅ safe logging (fixed error)
+  if (isManual) {
+    console.log("✍️ MANUAL/ADMIN:", reqId);
+  } else {
+    console.log("📍 GPS:", reqId);
+  }
 
   res.sendStatus(200);
 });
@@ -74,7 +73,7 @@ app.post('/start', (req, res) => {
 });
 
 
-// 🔴 STOP TRACKING
+// 🔴 STOP TRACKING + DISCONNECT EVENT
 app.post('/stop', (req, res) => {
   const { reqId } = req.body;
 
@@ -93,7 +92,7 @@ app.post('/stop', (req, res) => {
 });
 
 
-// 📊 FETCH LOCATIONS
+// 📊 FETCH ALL LOCATIONS
 app.get('/locations', (req, res) => {
   res.json(locations);
 });
