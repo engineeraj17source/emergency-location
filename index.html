@@ -54,6 +54,7 @@ const token = params.get("token");
 let watchId = null;
 let lastLat = null;
 let lastLon = null;
+let lastAcc = null;
 let tracking = false;
 
 function setStatus(msg) {
@@ -78,11 +79,29 @@ function startTracking() {
     function(position) {
       const lat = position.coords.latitude;
       const lon = position.coords.longitude;
+      const acc = position.coords.accuracy;
 
       lastLat = lat;
       lastLon = lon;
+      lastAcc = acc;
 
-      setStatus(`TRACKING\nLat: ${lat}\nLon: ${lon}`);
+      // ⚠️ accuracy warning logic
+      let qualityMsg = "";
+      if (acc > 100) {
+        qualityMsg = "\n⚠️ Low GPS accuracy";
+      } else if (acc > 50) {
+        qualityMsg = "\n🟡 Medium GPS accuracy";
+      } else {
+        qualityMsg = "\n🟢 High GPS accuracy";
+      }
+
+      setStatus(
+`TRACKING ACTIVE
+
+Lat: ${lat}
+Lon: ${lon}
+Accuracy: ±${acc}m${qualityMsg}`
+      );
 
       fetch(`${BASE_URL}/location`, {
         method: "POST",
@@ -90,13 +109,21 @@ function startTracking() {
           "Content-Type": "application/json",
           "Authorization": token
         },
-        body: JSON.stringify({ lat, lon })
+        body: JSON.stringify({
+          lat,
+          lon,
+          accuracy: acc   // ✅ added
+        })
       });
     },
     function() {
-      setStatus("⚠️ GPS error");
+      setStatus("⚠️ GPS error. Enable location.");
     },
-    { enableHighAccuracy: true }
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
+    }
   );
 
   fetch(`${BASE_URL}/start`, {
@@ -132,11 +159,13 @@ function stopTracking() {
 function sendSMS() {
   let lat = lastLat || "NA";
   let lon = lastLon || "NA";
+  let acc = lastAcc ? `±${lastAcc}m` : "NA";
 
   const message =
 `EMERGENCY ALERT
 Lat: ${lat}
 Lon: ${lon}
+Accuracy: ${acc}
 Time: ${new Date().toLocaleString()}`;
 
   window.location.href =
