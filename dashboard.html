@@ -69,7 +69,6 @@
 
   <hr>
 
-  <!-- 🔥 SINGLE BUTTON -->
   <button onclick="generateAndCopyLink()">
     Generate & Copy Link
   </button>
@@ -204,7 +203,21 @@ async function addManualLocation() {
 }
 
 //
-// 📡 LIVE TRACKING (UNCHANGED CORE)
+// 🗑️ REMOVE USER (FRONTEND ONLY)
+//
+function removeUser(id) {
+  if (markers[id]) {
+    map.removeLayer(markers[id]);
+    delete markers[id];
+  }
+
+  delete userLastSeen[id];
+
+  updateUserPanel([]);
+}
+
+//
+// 📡 LIVE TRACKING
 //
 async function loadLocations() {
   const res = await fetch('/locations', {
@@ -267,6 +280,15 @@ function updateUserPanel(data) {
     div.innerHTML = `
       <b>${id}</b><br>
       <small>${new Date(userLastSeen[id]).toLocaleTimeString()}</small>
+      <button style="
+        margin-top:5px;
+        background:red;
+        color:white;
+        border:none;
+        padding:4px;
+        width:100%;
+        cursor:pointer;
+      ">Remove</button>
     `;
 
     div.onclick = () => {
@@ -274,6 +296,11 @@ function updateUserPanel(data) {
         map.setView(markers[id].getLatLng(), 16);
         markers[id].openPopup();
       }
+    };
+
+    div.querySelector("button").onclick = (e) => {
+      e.stopPropagation();
+      removeUser(id);
     };
 
     panel.appendChild(div);
