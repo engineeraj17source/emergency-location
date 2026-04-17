@@ -29,6 +29,9 @@ const locationSchema = new mongoose.Schema({
   time: { type: Date, default: Date.now }
 });
 
+// 📊 INDEX (STEP 4)
+locationSchema.index({ reqId: 1, time: -1 });
+
 const Location = mongoose.model('Location', locationSchema);
 
 const sessionSchema = new mongoose.Schema({
@@ -40,8 +43,8 @@ const sessionSchema = new mongoose.Schema({
 const Session = mongoose.model('Session', sessionSchema);
 
 
-// 🔐 AUTH MIDDLEWARE
-function auth(req, res, next) {
+// 🔐 AUTH MIDDLEWARE (STEP 3 UPDATED)
+async function auth(req, res, next) {
   const token = req.headers.authorization;
 
   if (!token) {
@@ -50,17 +53,25 @@ function auth(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, SECRET);
+
+    const session = await Session.findOne({ reqId: decoded.reqId });
+
+    if (!session) {
+      return res.status(403).json({ error: "Session not found" });
+    }
+
     req.reqId = decoded.reqId;
     next();
+
   } catch (err) {
     return res.status(403).json({ error: "Invalid or expired token" });
   }
 }
 
 
-// 🔗 GENERATE SECURE LINK
+// 🔗 GENERATE SECURE LINK (STEP 2 UPDATED)
 app.get('/generate', async (req, res) => {
-  const reqId = "REQ_" + Math.floor(Math.random() * 10000);
+  const reqId = "REQ_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
 
   await Session.create({ reqId });
 
