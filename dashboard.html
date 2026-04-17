@@ -15,11 +15,11 @@
       padding: 10px;
       border-radius: 8px;
       z-index: 1000;
-      width: 220px;
+      width: 230px;
     }
 
     input {
-      width: 200px;
+      width: 210px;
       margin-bottom: 5px;
     }
 
@@ -41,18 +41,21 @@
 
 <div class="panel">
 
-  <b>Admin Manual Entry</b><br><br>
+  <b>Admin Panel</b><br><br>
 
-  <input id="reqIdInput" placeholder="Req ID"><br>
-  <input id="latInput" placeholder="Latitude"><br>
-  <input id="lonInput" placeholder="Longitude"><br>
+  <input id="reqIdInput" placeholder="Req ID">
+  <input id="latInput" placeholder="Latitude">
+  <input id="lonInput" placeholder="Longitude">
 
   <button onclick="addManualLocation()">Add Location</button>
 
   <hr>
 
   <button onclick="generateLink()">Generate Link</button>
-  <p id="linkText" style="font-size:12px;"></p>
+
+  <button onclick="copyLink()">Copy Link</button>
+
+  <p id="linkText" style="font-size:12px; word-break: break-all;"></p>
 
   <button id="fetchBtn" class="gray" onclick="fetchLatest()">
     Fetch Location
@@ -75,6 +78,9 @@ const markers = {};
 const colors = ["red","blue","green","orange","purple"];
 const reqColorMap = {};
 
+let generatedLink = "";
+const token = localStorage.getItem("token");
+
 function getColor(id){
   if(!reqColorMap[id]){
     const i = Object.keys(reqColorMap).length % colors.length;
@@ -93,21 +99,56 @@ function createIcon(color){
 }
 
 //
-// 🔥 1. GENERATE LINK
+// 🔗 GENERATE LINK
 //
 async function generateLink() {
   const res = await fetch('/generate');
   const data = await res.json();
 
-  document.getElementById("linkText").innerText = data.link;
+  generatedLink = data.link;
+
+  document.getElementById("linkText").innerText = generatedLink;
+
+  // store token safely
+  try {
+    const url = new URL(generatedLink);
+    const t = url.searchParams.get("token");
+    if (t) localStorage.setItem("token", t);
+  } catch (e) {
+    console.error("Invalid link");
+  }
 }
 
 //
-// 📍 2. FETCH LATEST (BUTTON LOGIC)
+// 📋 COPY LINK BUTTON
+//
+function copyLink() {
+  if (!generatedLink) {
+    alert("Generate link first");
+    return;
+  }
+
+  navigator.clipboard.writeText(generatedLink);
+  alert("Link copied!");
+}
+
+//
+// 📍 FETCH LATEST LOCATION (SAFE)
 //
 async function fetchLatest() {
-  const res = await fetch('/locations');
+  const res = await fetch('/locations', {
+    headers: {
+      Authorization: localStorage.getItem("token")
+    }
+  });
+
   const data = await res.json();
+
+  if (!Array.isArray(data)) {
+    console.error("API error:", data);
+    alert("Unauthorized or no data");
+    return;
+  }
 
   if (!data.length) {
     alert("No location found");
@@ -133,7 +174,7 @@ async function fetchLatest() {
 }
 
 //
-// 🔥 ADMIN MANUAL ENTRY (UNCHANGED)
+// 🔥 MANUAL ENTRY
 //
 async function addManualLocation() {
   const reqId = document.getElementById("reqIdInput").value;
@@ -147,7 +188,10 @@ async function addManualLocation() {
 
   await fetch('/location', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': localStorage.getItem("token")
+    },
     body: JSON.stringify({
       lat,
       lon,
@@ -161,20 +205,27 @@ async function addManualLocation() {
 }
 
 //
-// 📡 ORIGINAL LIVE TRACKING (UNCHANGED - IMPORTANT)
+// 📡 LIVE TRACKING (STABLE)
 //
-async function loadLocations(){
-  const res = await fetch('/locations');
+async function loadLocations() {
+  const res = await fetch('/locations', {
+    headers: {
+      Authorization: localStorage.getItem("token")
+    }
+  });
+
   const data = await res.json();
 
+  if (!Array.isArray(data)) return;
+
   data.forEach(loc => {
-    if(loc.event === "DISCONNECTED") return;
+    if (loc.event === "DISCONNECTED") return;
 
     const id = loc.reqId || "unknown";
     const latlng = [loc.lat, loc.lon];
     const color = getColor(id);
 
-    if(markers[id]){
+    if (markers[id]) {
       markers[id].setLatLng(latlng);
     } else {
       const marker = L.marker(latlng, {
@@ -186,7 +237,6 @@ async function loadLocations(){
       );
 
       markers[id] = marker;
-      map.setView(latlng, 15);
     }
   });
 }
