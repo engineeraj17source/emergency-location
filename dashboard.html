@@ -15,11 +15,11 @@
       padding: 10px;
       border-radius: 8px;
       z-index: 1000;
-      width: 250px;
+      width: 260px;
     }
 
     input {
-      width: 220px;
+      width: 230px;
       margin-bottom: 5px;
     }
 
@@ -34,7 +34,7 @@
     .gray { background: gray; color: white; }
 
     #userList {
-      max-height: 220px;
+      max-height: 240px;
       overflow-y: auto;
       font-size: 12px;
       border-top: 1px solid #ddd;
@@ -42,7 +42,7 @@
     }
 
     .user-item {
-      padding: 5px;
+      padding: 6px;
       border-bottom: 1px solid #eee;
       cursor: pointer;
     }
@@ -69,9 +69,7 @@
 
   <hr>
 
-  <button onclick="generateAndCopyLink()">
-    Generate & Copy Link
-  </button>
+  <button onclick="generateAndCopyLink()">Generate & Copy Link</button>
 
   <p id="linkText" style="font-size:12px; word-break: break-all;"></p>
 
@@ -103,8 +101,7 @@ const reqColorMap = {};
 
 let generatedLink = "";
 let userLastSeen = {};
-
-// ✅ NEW
+let userCoords = {};     // ✅ NEW
 let hiddenUsers = new Set();
 
 function getColor(id){
@@ -142,13 +139,9 @@ async function generateAndCopyLink() {
 }
 
 async function fetchLatest() {
-  const res = await fetch('/locations', {
-    headers: {
-      Authorization: localStorage.getItem("token")
-    }
-  });
-
+  const res = await fetch('/locations');
   const data = await res.json();
+
   if (!Array.isArray(data)) return;
 
   const latest = [...data].reverse().find(l => l.lat && l.lon);
@@ -177,10 +170,7 @@ async function addManualLocation() {
 
   await fetch('/location', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': localStorage.getItem("token")
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       lat,
       lon,
@@ -193,9 +183,6 @@ async function addManualLocation() {
   alert("Added");
 }
 
-//
-// 🗑️ REMOVE USER (FIXED)
-//
 function removeUser(id) {
   hiddenUsers.add(id);
 
@@ -207,36 +194,45 @@ function removeUser(id) {
   updateUserPanel([]);
 }
 
-//
-// 📡 LIVE TRACKING (FIXED)
-//
-async function loadLocations() {
-  const res = await fetch('/locations', {
-    headers: {
-      Authorization: localStorage.getItem("token")
-    }
-  });
+// ✅ COPY FUNCTIONS
+function copyLat(id) {
+  const val = userCoords[id]?.lat;
+  if (!val) return alert("No latitude");
+  navigator.clipboard.writeText(val.toString());
+  alert("Latitude copied: " + val);
+}
 
+function copyLon(id) {
+  const val = userCoords[id]?.lon;
+  if (!val) return alert("No longitude");
+  navigator.clipboard.writeText(val.toString());
+  alert("Longitude copied: " + val);
+}
+
+async function loadLocations() {
+  const res = await fetch('/locations');
   const data = await res.json();
   if (!Array.isArray(data)) return;
-
-  updateUserPanel(data);
 
   data.forEach(loc => {
     if (loc.event === "DISCONNECTED") return;
 
     const id = loc.reqId || "unknown";
 
-    // ✅ skip hidden
+    userLastSeen[id] = loc.time || Date.now();
+
+    // ✅ store coords
+    if (loc.lat && loc.lon) {
+      userCoords[id] = { lat: loc.lat, lon: loc.lon };
+    }
+
+    // restore if new activity
+    hiddenUsers.delete(id);
+
     if (hiddenUsers.has(id)) return;
 
     const latlng = [loc.lat, loc.lon];
     const color = getColor(id);
-
-    userLastSeen[id] = loc.time || Date.now();
-
-    // ✅ auto-restore
-    hiddenUsers.delete(id);
 
     if (markers[id]) {
       markers[id].setLatLng(latlng);
@@ -246,12 +242,14 @@ async function loadLocations() {
       }).addTo(map);
 
       marker.bindPopup(
-        `Req: ${id}<br>Type: ${loc.type || "GPS"}<br>Source: ${loc.source || "USER"}`
+        `Req: ${id}<br>Lat: ${loc.lat}<br>Lon: ${loc.lon}`
       );
 
       markers[id] = marker;
     }
   });
+
+  updateUserPanel(data);
 }
 
 setInterval(loadLocations, 3000);
@@ -272,18 +270,18 @@ function updateUserPanel(data) {
     const div = document.createElement("div");
     div.className = "user-item";
 
+    const lat = userCoords[id]?.lat || "-";
+    const lon = userCoords[id]?.lon || "-";
+
     div.innerHTML = `
       <b>${id}</b><br>
-      <small>${new Date(userLastSeen[id]).toLocaleTimeString()}</small>
-      <button style="
-        margin-top:5px;
-        background:red;
-        color:white;
-        border:none;
-        padding:4px;
-        width:100%;
-        cursor:pointer;
-      ">Remove</button>
+      <small>${new Date(userLastSeen[id]).toLocaleTimeString()}</small><br>
+      <small>Lat: ${lat}</small><br>
+      <small>Lon: ${lon}</small>
+
+      <button style="background:green;color:white;">Copy Lat</button>
+      <button style="background:blue;color:white;">Copy Lon</button>
+      <button style="background:red;color:white;">Remove</button>
     `;
 
     div.onclick = () => {
@@ -293,7 +291,19 @@ function updateUserPanel(data) {
       }
     };
 
-    div.querySelector("button").onclick = (e) => {
+    const btns = div.querySelectorAll("button");
+
+    btns[0].onclick = (e) => {
+      e.stopPropagation();
+      copyLat(id);
+    };
+
+    btns[1].onclick = (e) => {
+      e.stopPropagation();
+      copyLon(id);
+    };
+
+    btns[2].onclick = (e) => {
       e.stopPropagation();
       removeUser(id);
     };
