@@ -12,7 +12,7 @@
       top: 20px;
       left: 10px;
       background: white;
-      padding: 12px;
+      padding: 10px;
       border-radius: 8px;
       z-index: 1000;
       width: 220px;
@@ -24,21 +24,14 @@
     }
 
     button {
-      margin: 4px 0;
-      padding: 6px;
       width: 100%;
+      margin: 3px 0;
+      padding: 6px;
       cursor: pointer;
     }
 
-    .green {
-      background: green;
-      color: white;
-    }
-
-    .gray {
-      background: gray;
-      color: white;
-    }
+    .green { background: green; color: white; }
+    .gray { background: gray; color: white; }
   </style>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -61,7 +54,7 @@
   <button onclick="generateLink()">Generate Link</button>
   <p id="linkText" style="font-size:12px;"></p>
 
-  <button id="fetchBtn" class="gray" onclick="fetchLatestLocation()">
+  <button id="fetchBtn" class="gray" onclick="fetchLatest()">
     Fetch Location
   </button>
 
@@ -81,8 +74,6 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 const markers = {};
 const colors = ["red","blue","green","orange","purple"];
 const reqColorMap = {};
-
-let latestData = [];
 
 function getColor(id){
   if(!reqColorMap[id]){
@@ -112,9 +103,9 @@ async function generateLink() {
 }
 
 //
-// 📍 2. FETCH LATEST LOCATION (BUTTON LOGIC)
+// 📍 2. FETCH LATEST (BUTTON LOGIC)
 //
-async function fetchLatestLocation() {
+async function fetchLatest() {
   const res = await fetch('/locations');
   const data = await res.json();
 
@@ -123,14 +114,9 @@ async function fetchLatestLocation() {
     return;
   }
 
-  latestData = data;
+  document.getElementById("fetchBtn").classList.remove("gray");
+  document.getElementById("fetchBtn").classList.add("green");
 
-  // 🟢 turn button green
-  const btn = document.getElementById("fetchBtn");
-  btn.classList.remove("gray");
-  btn.classList.add("green");
-
-  // get latest valid location
   const latest = [...data].reverse().find(l => l.lat && l.lon);
 
   if (latest) {
@@ -143,9 +129,6 @@ async function fetchLatestLocation() {
     }
 
     map.setView(pos, 16);
-    markers["_latest"].bindPopup(
-      `Latest Location<br>Req: ${latest.reqId}`
-    ).openPopup();
   }
 }
 
@@ -178,7 +161,7 @@ async function addManualLocation() {
 }
 
 //
-// 📡 LIVE AUTO UPDATE (YOUR ORIGINAL LOGIC)
+// 📡 ORIGINAL LIVE TRACKING (UNCHANGED - IMPORTANT)
 //
 async function loadLocations(){
   const res = await fetch('/locations');
