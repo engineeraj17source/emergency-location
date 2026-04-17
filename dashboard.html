@@ -9,17 +9,35 @@
 
     .panel {
       position: absolute;
-      top: 100px;
+      top: 20px;
       left: 10px;
       background: white;
-      padding: 10px;
+      padding: 12px;
       border-radius: 8px;
       z-index: 1000;
+      width: 220px;
     }
 
     input {
-      width: 150px;
+      width: 200px;
       margin-bottom: 5px;
+    }
+
+    button {
+      margin: 4px 0;
+      padding: 6px;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .green {
+      background: green;
+      color: white;
+    }
+
+    .gray {
+      background: gray;
+      color: white;
     }
   </style>
 
@@ -29,6 +47,7 @@
 <body>
 
 <div class="panel">
+
   <b>Admin Manual Entry</b><br><br>
 
   <input id="reqIdInput" placeholder="Req ID"><br>
@@ -36,6 +55,16 @@
   <input id="lonInput" placeholder="Longitude"><br>
 
   <button onclick="addManualLocation()">Add Location</button>
+
+  <hr>
+
+  <button onclick="generateLink()">Generate Link</button>
+  <p id="linkText" style="font-size:12px;"></p>
+
+  <button id="fetchBtn" class="gray" onclick="fetchLatestLocation()">
+    Fetch Location
+  </button>
+
 </div>
 
 <div id="map"></div>
@@ -52,6 +81,8 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 const markers = {};
 const colors = ["red","blue","green","orange","purple"];
 const reqColorMap = {};
+
+let latestData = [];
 
 function getColor(id){
   if(!reqColorMap[id]){
@@ -70,7 +101,57 @@ function createIcon(color){
   });
 }
 
-// 🔥 ADMIN MANUAL ENTRY
+//
+// 🔥 1. GENERATE LINK
+//
+async function generateLink() {
+  const res = await fetch('/generate');
+  const data = await res.json();
+
+  document.getElementById("linkText").innerText = data.link;
+}
+
+//
+// 📍 2. FETCH LATEST LOCATION (BUTTON LOGIC)
+//
+async function fetchLatestLocation() {
+  const res = await fetch('/locations');
+  const data = await res.json();
+
+  if (!data.length) {
+    alert("No location found");
+    return;
+  }
+
+  latestData = data;
+
+  // 🟢 turn button green
+  const btn = document.getElementById("fetchBtn");
+  btn.classList.remove("gray");
+  btn.classList.add("green");
+
+  // get latest valid location
+  const latest = [...data].reverse().find(l => l.lat && l.lon);
+
+  if (latest) {
+    const pos = [latest.lat, latest.lon];
+
+    if (markers["_latest"]) {
+      markers["_latest"].setLatLng(pos);
+    } else {
+      markers["_latest"] = L.marker(pos).addTo(map);
+    }
+
+    map.setView(pos, 16);
+    markers["_latest"].bindPopup(
+      `Latest Location<br>Req: ${latest.reqId}`
+    ).openPopup();
+  }
+}
+
+//
+// 🔥 ADMIN MANUAL ENTRY (UNCHANGED)
+//
 async function addManualLocation() {
   const reqId = document.getElementById("reqIdInput").value;
   const lat = parseFloat(document.getElementById("latInput").value);
@@ -96,8 +177,9 @@ async function addManualLocation() {
   alert("Manual location added");
 }
 
-
-// 📍 LOAD LOCATIONS
+//
+// 📡 LIVE AUTO UPDATE (YOUR ORIGINAL LOGIC)
+//
 async function loadLocations(){
   const res = await fetch('/locations');
   const data = await res.json();
