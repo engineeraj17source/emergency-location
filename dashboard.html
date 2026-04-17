@@ -101,7 +101,7 @@ const reqColorMap = {};
 
 let generatedLink = "";
 let userLastSeen = {};
-let userCoords = {};     // ✅ NEW
+let userCoords = {};
 let hiddenUsers = new Set();
 
 function getColor(id){
@@ -121,6 +121,7 @@ function createIcon(color){
   });
 }
 
+// 🔗 Generate + Copy Link
 async function generateAndCopyLink() {
   const res = await fetch('/generate');
   const data = await res.json();
@@ -138,6 +139,7 @@ async function generateAndCopyLink() {
   alert("Link generated & copied!");
 }
 
+// 📍 Fetch Latest
 async function fetchLatest() {
   const res = await fetch('/locations');
   const data = await res.json();
@@ -161,6 +163,7 @@ async function fetchLatest() {
   map.setView(pos, 16);
 }
 
+// 🔥 Manual Entry
 async function addManualLocation() {
   const reqId = document.getElementById("reqIdInput").value;
   const lat = parseFloat(document.getElementById("latInput").value);
@@ -183,6 +186,7 @@ async function addManualLocation() {
   alert("Added");
 }
 
+// 🗑️ Remove (non-permanent)
 function removeUser(id) {
   hiddenUsers.add(id);
 
@@ -191,27 +195,29 @@ function removeUser(id) {
     delete markers[id];
   }
 
-  updateUserPanel([]);
+  updateUserPanel();
 }
 
-// ✅ COPY FUNCTIONS
+// 📋 Copy functions
 function copyLat(id) {
   const val = userCoords[id]?.lat;
-  if (!val) return alert("No latitude");
+  if (val === undefined) return alert("No latitude");
   navigator.clipboard.writeText(val.toString());
   alert("Latitude copied: " + val);
 }
 
 function copyLon(id) {
   const val = userCoords[id]?.lon;
-  if (!val) return alert("No longitude");
+  if (val === undefined) return alert("No longitude");
   navigator.clipboard.writeText(val.toString());
   alert("Longitude copied: " + val);
 }
 
+// 📡 Live tracking
 async function loadLocations() {
   const res = await fetch('/locations');
   const data = await res.json();
+
   if (!Array.isArray(data)) return;
 
   data.forEach(loc => {
@@ -221,43 +227,43 @@ async function loadLocations() {
 
     userLastSeen[id] = loc.time || Date.now();
 
-    // ✅ store coords
-    if (loc.lat && loc.lon) {
+    if (typeof loc.lat === "number" && typeof loc.lon === "number") {
+
       userCoords[id] = { lat: loc.lat, lon: loc.lon };
-    }
 
-    // restore if new activity
-    hiddenUsers.delete(id);
+      // restore if user sends data again
+      hiddenUsers.delete(id);
 
-    if (hiddenUsers.has(id)) return;
+      if (hiddenUsers.has(id)) return;
 
-    const latlng = [loc.lat, loc.lon];
-    const color = getColor(id);
+      const latlng = [loc.lat, loc.lon];
+      const color = getColor(id);
 
-    if (markers[id]) {
-      markers[id].setLatLng(latlng);
-    } else {
-      const marker = L.marker(latlng, {
-        icon: createIcon(color)
-      }).addTo(map);
+      if (markers[id]) {
+        markers[id].setLatLng(latlng);
+      } else {
+        const marker = L.marker(latlng, {
+          icon: createIcon(color)
+        }).addTo(map);
 
-      marker.bindPopup(
-        `Req: ${id}<br>Lat: ${loc.lat}<br>Lon: ${loc.lon}`
-      );
+        marker.bindPopup(
+          `Req: ${id}<br>Lat: ${loc.lat}<br>Lon: ${loc.lon}`
+        );
 
-      markers[id] = marker;
+        markers[id] = marker;
+      }
     }
   });
 
-  updateUserPanel(data);
+  updateUserPanel();
 }
 
 setInterval(loadLocations, 3000);
 loadLocations();
 
-function updateUserPanel(data) {
+// 👥 User panel
+function updateUserPanel() {
   const panel = document.getElementById("userList");
-  if (!Array.isArray(data)) return;
 
   const sorted = Object.keys(userLastSeen)
     .sort((a, b) => new Date(userLastSeen[b]) - new Date(userLastSeen[a]));
@@ -270,8 +276,8 @@ function updateUserPanel(data) {
     const div = document.createElement("div");
     div.className = "user-item";
 
-    const lat = userCoords[id]?.lat || "-";
-    const lon = userCoords[id]?.lon || "-";
+    const lat = userCoords[id]?.lat ?? "-";
+    const lon = userCoords[id]?.lon ?? "-";
 
     div.innerHTML = `
       <b>${id}</b><br>
