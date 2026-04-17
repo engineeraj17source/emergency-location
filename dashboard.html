@@ -104,6 +104,9 @@ const reqColorMap = {};
 let generatedLink = "";
 let userLastSeen = {};
 
+// ✅ NEW
+let hiddenUsers = new Set();
+
 function getColor(id){
   if(!reqColorMap[id]){
     const i = Object.keys(reqColorMap).length % colors.length;
@@ -121,15 +124,11 @@ function createIcon(color){
   });
 }
 
-//
-// 🔗 GENERATE + COPY LINK
-//
 async function generateAndCopyLink() {
   const res = await fetch('/generate');
   const data = await res.json();
 
   generatedLink = data.link;
-
   document.getElementById("linkText").innerText = generatedLink;
 
   try {
@@ -142,9 +141,6 @@ async function generateAndCopyLink() {
   alert("Link generated & copied!");
 }
 
-//
-// 📍 FETCH LATEST LOCATION
-//
 async function fetchLatest() {
   const res = await fetch('/locations', {
     headers: {
@@ -153,11 +149,9 @@ async function fetchLatest() {
   });
 
   const data = await res.json();
-
   if (!Array.isArray(data)) return;
 
   const latest = [...data].reverse().find(l => l.lat && l.lon);
-
   if (!latest) return;
 
   document.getElementById("fetchBtn").classList.remove("gray");
@@ -174,9 +168,6 @@ async function fetchLatest() {
   map.setView(pos, 16);
 }
 
-//
-// 🔥 MANUAL ENTRY
-//
 async function addManualLocation() {
   const reqId = document.getElementById("reqIdInput").value;
   const lat = parseFloat(document.getElementById("latInput").value);
@@ -203,21 +194,21 @@ async function addManualLocation() {
 }
 
 //
-// 🗑️ REMOVE USER (FRONTEND ONLY)
+// 🗑️ REMOVE USER (FIXED)
 //
 function removeUser(id) {
+  hiddenUsers.add(id);
+
   if (markers[id]) {
     map.removeLayer(markers[id]);
     delete markers[id];
   }
 
-  delete userLastSeen[id];
-
   updateUserPanel([]);
 }
 
 //
-// 📡 LIVE TRACKING
+// 📡 LIVE TRACKING (FIXED)
 //
 async function loadLocations() {
   const res = await fetch('/locations', {
@@ -227,7 +218,6 @@ async function loadLocations() {
   });
 
   const data = await res.json();
-
   if (!Array.isArray(data)) return;
 
   updateUserPanel(data);
@@ -236,10 +226,17 @@ async function loadLocations() {
     if (loc.event === "DISCONNECTED") return;
 
     const id = loc.reqId || "unknown";
+
+    // ✅ skip hidden
+    if (hiddenUsers.has(id)) return;
+
     const latlng = [loc.lat, loc.lon];
     const color = getColor(id);
 
     userLastSeen[id] = loc.time || Date.now();
+
+    // ✅ auto-restore
+    hiddenUsers.delete(id);
 
     if (markers[id]) {
       markers[id].setLatLng(latlng);
@@ -260,12 +257,8 @@ async function loadLocations() {
 setInterval(loadLocations, 3000);
 loadLocations();
 
-//
-// 👥 USER PANEL
-//
 function updateUserPanel(data) {
   const panel = document.getElementById("userList");
-
   if (!Array.isArray(data)) return;
 
   const sorted = Object.keys(userLastSeen)
@@ -274,6 +267,8 @@ function updateUserPanel(data) {
   panel.innerHTML = "";
 
   sorted.forEach(id => {
+    if (hiddenUsers.has(id)) return;
+
     const div = document.createElement("div");
     div.className = "user-item";
 
