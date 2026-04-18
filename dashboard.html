@@ -69,7 +69,6 @@
 
   <hr>
 
-  <!-- 🔥 SINGLE BUTTON -->
   <button onclick="generateAndCopyLink()">
     Generate & Copy Link
   </button>
@@ -104,6 +103,7 @@ const reqColorMap = {};
 
 let generatedLink = "";
 let userLastSeen = {};
+let userCoords = {}; // ✅ store lat/lon per user
 
 function getColor(id){
   if(!reqColorMap[id]){
@@ -122,15 +122,12 @@ function createIcon(color){
   });
 }
 
-//
-// 🔗 GENERATE + COPY LINK
-//
+// 🔗 Generate + Copy Link
 async function generateAndCopyLink() {
   const res = await fetch('/generate');
   const data = await res.json();
 
   generatedLink = data.link;
-
   document.getElementById("linkText").innerText = generatedLink;
 
   try {
@@ -143,9 +140,7 @@ async function generateAndCopyLink() {
   alert("Link generated & copied!");
 }
 
-//
-// 📍 FETCH LATEST LOCATION
-//
+// 📍 Fetch Latest
 async function fetchLatest() {
   const res = await fetch('/locations', {
     headers: {
@@ -154,11 +149,9 @@ async function fetchLatest() {
   });
 
   const data = await res.json();
-
   if (!Array.isArray(data)) return;
 
   const latest = [...data].reverse().find(l => l.lat && l.lon);
-
   if (!latest) return;
 
   document.getElementById("fetchBtn").classList.remove("gray");
@@ -175,9 +168,7 @@ async function fetchLatest() {
   map.setView(pos, 16);
 }
 
-//
-// 🔥 MANUAL ENTRY
-//
+// 🔥 Manual Entry
 async function addManualLocation() {
   const reqId = document.getElementById("reqIdInput").value;
   const lat = parseFloat(document.getElementById("latInput").value);
@@ -203,9 +194,22 @@ async function addManualLocation() {
   alert("Added");
 }
 
-//
-// 📡 LIVE TRACKING (UNCHANGED CORE)
-//
+// 📋 Copy functions
+function copyLat(id) {
+  const lat = userCoords[id]?.lat;
+  if (lat === undefined) return alert("No latitude");
+  navigator.clipboard.writeText(lat.toString());
+  alert("Latitude copied: " + lat);
+}
+
+function copyLon(id) {
+  const lon = userCoords[id]?.lon;
+  if (lon === undefined) return alert("No longitude");
+  navigator.clipboard.writeText(lon.toString());
+  alert("Longitude copied: " + lon);
+}
+
+// 📡 Live tracking
 async function loadLocations() {
   const res = await fetch('/locations', {
     headers: {
@@ -214,7 +218,6 @@ async function loadLocations() {
   });
 
   const data = await res.json();
-
   if (!Array.isArray(data)) return;
 
   updateUserPanel(data);
@@ -227,6 +230,11 @@ async function loadLocations() {
     const color = getColor(id);
 
     userLastSeen[id] = loc.time || Date.now();
+
+    // ✅ store coords
+    if (typeof loc.lat === "number" && typeof loc.lon === "number") {
+      userCoords[id] = { lat: loc.lat, lon: loc.lon };
+    }
 
     if (markers[id]) {
       markers[id].setLatLng(latlng);
@@ -247,13 +255,9 @@ async function loadLocations() {
 setInterval(loadLocations, 3000);
 loadLocations();
 
-//
-// 👥 USER PANEL
-//
-function updateUserPanel(data) {
+// 👥 User panel
+function updateUserPanel() {
   const panel = document.getElementById("userList");
-
-  if (!Array.isArray(data)) return;
 
   const sorted = Object.keys(userLastSeen)
     .sort((a, b) => new Date(userLastSeen[b]) - new Date(userLastSeen[a]));
@@ -264,9 +268,17 @@ function updateUserPanel(data) {
     const div = document.createElement("div");
     div.className = "user-item";
 
+    const lat = userCoords[id]?.lat ?? "-";
+    const lon = userCoords[id]?.lon ?? "-";
+
     div.innerHTML = `
       <b>${id}</b><br>
-      <small>${new Date(userLastSeen[id]).toLocaleTimeString()}</small>
+      <small>${new Date(userLastSeen[id]).toLocaleTimeString()}</small><br>
+      <small>Lat: ${lat}</small><br>
+      <small>Lon: ${lon}</small>
+
+      <button style="background:green;color:white;">Copy Lat</button>
+      <button style="background:blue;color:white;">Copy Lon</button>
     `;
 
     div.onclick = () => {
@@ -274,6 +286,18 @@ function updateUserPanel(data) {
         map.setView(markers[id].getLatLng(), 16);
         markers[id].openPopup();
       }
+    };
+
+    const btns = div.querySelectorAll("button");
+
+    btns[0].onclick = (e) => {
+      e.stopPropagation();
+      copyLat(id);
+    };
+
+    btns[1].onclick = (e) => {
+      e.stopPropagation();
+      copyLon(id);
     };
 
     panel.appendChild(div);
