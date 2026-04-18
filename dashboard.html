@@ -15,11 +15,11 @@
       padding: 10px;
       border-radius: 8px;
       z-index: 1000;
-      width: 260px;
+      width: 250px;
     }
 
     input {
-      width: 230px;
+      width: 220px;
       margin-bottom: 5px;
     }
 
@@ -34,7 +34,7 @@
     .gray { background: gray; color: white; }
 
     #userList {
-      max-height: 240px;
+      max-height: 220px;
       overflow-y: auto;
       font-size: 12px;
       border-top: 1px solid #ddd;
@@ -42,7 +42,7 @@
     }
 
     .user-item {
-      padding: 6px;
+      padding: 5px;
       border-bottom: 1px solid #eee;
       cursor: pointer;
     }
@@ -69,7 +69,10 @@
 
   <hr>
 
-  <button onclick="generateAndCopyLink()">Generate & Copy Link</button>
+  <!-- 🔥 SINGLE BUTTON -->
+  <button onclick="generateAndCopyLink()">
+    Generate & Copy Link
+  </button>
 
   <p id="linkText" style="font-size:12px; word-break: break-all;"></p>
 
@@ -101,8 +104,6 @@ const reqColorMap = {};
 
 let generatedLink = "";
 let userLastSeen = {};
-let userCoords = {};
-let hiddenUsers = new Set();
 
 function getColor(id){
   if(!reqColorMap[id]){
@@ -121,12 +122,15 @@ function createIcon(color){
   });
 }
 
-// 🔗 Generate + Copy Link
+//
+// 🔗 GENERATE + COPY LINK
+//
 async function generateAndCopyLink() {
   const res = await fetch('/generate');
   const data = await res.json();
 
   generatedLink = data.link;
+
   document.getElementById("linkText").innerText = generatedLink;
 
   try {
@@ -139,14 +143,22 @@ async function generateAndCopyLink() {
   alert("Link generated & copied!");
 }
 
-// 📍 Fetch Latest
+//
+// 📍 FETCH LATEST LOCATION
+//
 async function fetchLatest() {
-  const res = await fetch('/locations');
+  const res = await fetch('/locations', {
+    headers: {
+      Authorization: localStorage.getItem("token")
+    }
+  });
+
   const data = await res.json();
 
   if (!Array.isArray(data)) return;
 
   const latest = [...data].reverse().find(l => l.lat && l.lon);
+
   if (!latest) return;
 
   document.getElementById("fetchBtn").classList.remove("gray");
@@ -163,7 +175,9 @@ async function fetchLatest() {
   map.setView(pos, 16);
 }
 
-// 🔥 Manual Entry
+//
+// 🔥 MANUAL ENTRY
+//
 async function addManualLocation() {
   const reqId = document.getElementById("reqIdInput").value;
   const lat = parseFloat(document.getElementById("latInput").value);
@@ -173,7 +187,10 @@ async function addManualLocation() {
 
   await fetch('/location', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': localStorage.getItem("token")
+    },
     body: JSON.stringify({
       lat,
       lon,
@@ -186,84 +203,57 @@ async function addManualLocation() {
   alert("Added");
 }
 
-// 🗑️ Remove (non-permanent)
-function removeUser(id) {
-  hiddenUsers.add(id);
-
-  if (markers[id]) {
-    map.removeLayer(markers[id]);
-    delete markers[id];
-  }
-
-  updateUserPanel();
-}
-
-// 📋 Copy functions
-function copyLat(id) {
-  const val = userCoords[id]?.lat;
-  if (val === undefined) return alert("No latitude");
-  navigator.clipboard.writeText(val.toString());
-  alert("Latitude copied: " + val);
-}
-
-function copyLon(id) {
-  const val = userCoords[id]?.lon;
-  if (val === undefined) return alert("No longitude");
-  navigator.clipboard.writeText(val.toString());
-  alert("Longitude copied: " + val);
-}
-
-// 📡 Live tracking
+//
+// 📡 LIVE TRACKING (UNCHANGED CORE)
+//
 async function loadLocations() {
-  const res = await fetch('/locations');
+  const res = await fetch('/locations', {
+    headers: {
+      Authorization: localStorage.getItem("token")
+    }
+  });
+
   const data = await res.json();
 
   if (!Array.isArray(data)) return;
+
+  updateUserPanel(data);
 
   data.forEach(loc => {
     if (loc.event === "DISCONNECTED") return;
 
     const id = loc.reqId || "unknown";
+    const latlng = [loc.lat, loc.lon];
+    const color = getColor(id);
 
     userLastSeen[id] = loc.time || Date.now();
 
-    if (typeof loc.lat === "number" && typeof loc.lon === "number") {
+    if (markers[id]) {
+      markers[id].setLatLng(latlng);
+    } else {
+      const marker = L.marker(latlng, {
+        icon: createIcon(color)
+      }).addTo(map);
 
-      userCoords[id] = { lat: loc.lat, lon: loc.lon };
+      marker.bindPopup(
+        `Req: ${id}<br>Type: ${loc.type || "GPS"}<br>Source: ${loc.source || "USER"}`
+      );
 
-      // restore if user sends data again
-      hiddenUsers.delete(id);
-
-      if (hiddenUsers.has(id)) return;
-
-      const latlng = [loc.lat, loc.lon];
-      const color = getColor(id);
-
-      if (markers[id]) {
-        markers[id].setLatLng(latlng);
-      } else {
-        const marker = L.marker(latlng, {
-          icon: createIcon(color)
-        }).addTo(map);
-
-        marker.bindPopup(
-          `Req: ${id}<br>Lat: ${loc.lat}<br>Lon: ${loc.lon}`
-        );
-
-        markers[id] = marker;
-      }
+      markers[id] = marker;
     }
   });
-
-  updateUserPanel();
 }
 
 setInterval(loadLocations, 3000);
 loadLocations();
 
-// 👥 User panel
-function updateUserPanel() {
+//
+// 👥 USER PANEL
+//
+function updateUserPanel(data) {
   const panel = document.getElementById("userList");
+
+  if (!Array.isArray(data)) return;
 
   const sorted = Object.keys(userLastSeen)
     .sort((a, b) => new Date(userLastSeen[b]) - new Date(userLastSeen[a]));
@@ -271,23 +261,12 @@ function updateUserPanel() {
   panel.innerHTML = "";
 
   sorted.forEach(id => {
-    if (hiddenUsers.has(id)) return;
-
     const div = document.createElement("div");
     div.className = "user-item";
 
-    const lat = userCoords[id]?.lat ?? "-";
-    const lon = userCoords[id]?.lon ?? "-";
-
     div.innerHTML = `
       <b>${id}</b><br>
-      <small>${new Date(userLastSeen[id]).toLocaleTimeString()}</small><br>
-      <small>Lat: ${lat}</small><br>
-      <small>Lon: ${lon}</small>
-
-      <button style="background:green;color:white;">Copy Lat</button>
-      <button style="background:blue;color:white;">Copy Lon</button>
-      <button style="background:red;color:white;">Remove</button>
+      <small>${new Date(userLastSeen[id]).toLocaleTimeString()}</small>
     `;
 
     div.onclick = () => {
@@ -295,23 +274,6 @@ function updateUserPanel() {
         map.setView(markers[id].getLatLng(), 16);
         markers[id].openPopup();
       }
-    };
-
-    const btns = div.querySelectorAll("button");
-
-    btns[0].onclick = (e) => {
-      e.stopPropagation();
-      copyLat(id);
-    };
-
-    btns[1].onclick = (e) => {
-      e.stopPropagation();
-      copyLon(id);
-    };
-
-    btns[2].onclick = (e) => {
-      e.stopPropagation();
-      removeUser(id);
     };
 
     panel.appendChild(div);
